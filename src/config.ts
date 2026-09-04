@@ -5,7 +5,7 @@ export const KEYWORDS = [
   "자동차보험비교",
 ] as const;
 
-export const COMPANIES = ["삼성", "KB", "DB", "현대", "AXA", "캐롯", "네이버페이"] as const;
+export const COMPANIES = ["삼성", "KB", "DB", "현대", "AXA", "캐롯", "메리츠(운전자)"] as const;
 
 export const COMPANY_COLORS: Record<string, string> = {
   삼성: "#0057D9",
@@ -14,7 +14,7 @@ export const COMPANY_COLORS: Record<string, string> = {
   현대: "#FF7000",
   AXA: "#00008F",
   캐롯: "#E60000",
-  네이버페이: "#03C75A",
+  "메리츠(운전자)": "#E11D48",
 };
 
 export const TIME_SEGMENTS = [

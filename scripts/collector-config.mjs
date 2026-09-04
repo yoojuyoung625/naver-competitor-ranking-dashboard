@@ -7,7 +7,7 @@ export const companyRules = [
   { company: "현대", patterns: [/현대해상/i, /direct\.hi\.co\.kr/i] },
   { company: "AXA", patterns: [/AXA/i, /axa\.co\.kr/i, /axakorea\.com/i] },
   { company: "캐롯", patterns: [/캐롯/i, /carrotins\.com/i] },
-  { company: "네이버페이", patterns: [/네이버페이/i] },
+  { company: "메리츠(운전자)", patterns: [/메리츠화재/i, /meritzfire\.com/i, /meritzdirect\.com/i] },
 ];
 
 export const devices = {
