@@ -1,8 +1,31 @@
 # 네이버 경쟁사 검색 순위 분석 대시보드
 
+[![시간별 순위 수집](https://github.com/yoojuyoung625/naver-competitor-ranking-dashboard/actions/workflows/hourly-collection.yml/badge.svg)](https://github.com/yoojuyoung625/naver-competitor-ranking-dashboard/actions/workflows/hourly-collection.yml)
+[![전일 데이터 확정](https://github.com/yoojuyoung625/naver-competitor-ranking-dashboard/actions/workflows/daily-finalize.yml/badge.svg)](https://github.com/yoojuyoung625/naver-competitor-ranking-dashboard/actions/workflows/daily-finalize.yml)
+[![대시보드 배포](https://github.com/yoojuyoung625/naver-competitor-ranking-dashboard/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/yoojuyoung625/naver-competitor-ranking-dashboard/actions/workflows/deploy-pages.yml)
+
+### [대시보드 바로 열기](https://yoojuyoung625.github.io/naver-competitor-ranking-dashboard/)
+
 키워드·디바이스·시간대별 경쟁사 노출 순위를 수집하고 비교하는 분석 도구입니다. 기존 폐쇄망용 보고서의 정보 구조를 기준으로, 유지보수 가능한 React·TypeScript 프로젝트로 처음부터 다시 구성했습니다.
 
-> 현재 화면은 공개 가능한 샘플 데이터로 동작합니다. 실제 네이버 검색화면 수집기는 정책 검토와 수집 조건 확정 후 `collector/SearchCaptureAdapter`로 연결합니다.
+## 자동 업데이트 흐름
+
+```mermaid
+flowchart LR
+    A[매시간 05분<br/>GitHub Actions] --> B[네이버 검색<br/>PC + 모바일]
+    B --> C[4개 키워드<br/>업체 순위 판별]
+    C --> D{동일 업체<br/>중복 노출?}
+    D -->|예| E[네이버페이 배지<br/>광고 우선]
+    D -->|아니오| F[현재 순위 채택]
+    E --> G[Google Apps Script]
+    F --> G
+    G --> H[(Google Sheets<br/>시간별 원본 누적)]
+    H --> I[다음 날 09:00<br/>전일 데이터 확정]
+    I --> J[latest.json 누적]
+    J --> K[GitHub Pages<br/>그래프 자동 갱신]
+```
+
+GitHub Actions의 실행 상태와 각 단계의 로그·스크린샷은 저장소의 [Actions 화면](https://github.com/yoojuyoung625/naver-competitor-ranking-dashboard/actions)에서 확인할 수 있습니다.
 
 ## 현재 구현
 
@@ -26,6 +49,9 @@ src/lib/analytics.ts      평균 순위와 점유율 계산
 src/components/           필터·차트·표 컴포넌트
 src/App.tsx               대시보드 화면 조합
 collector/                예약 수집 및 캡처 인터페이스
+scripts/                  네이버 시간별 수집·전일 확정 실행기
+apps-script/              사용자 소유 Google Sheets 저장 API
+.github/workflows/        시간별 수집·전일 확정·Pages 배포
 server/schema.sql         누적 저장 스키마
 server/API.md             조회·재시도·스크린샷 API 계약
 ```
@@ -47,14 +73,14 @@ pnpm build
 
 생성된 `dist` 폴더는 GitHub Pages 같은 정적 호스팅에 배포할 수 있습니다.
 
-## 실제 수집 연결 전 확인사항
+## 수집 기준
 
-1. 키워드별 PC·모바일 수집 시간과 빈도
-2. 순위로 인정할 네이버 광고 영역
-3. 회사명과 광고 도메인 매핑 기준
-4. 비로그인·지역·브라우저 화면 크기 고정값
-5. 네이버 이용약관 및 robots 정책
-6. 스크린샷 보존 기간과 접근 권한
+1. 매시간 PC·모바일 검색 결과 수집
+2. 네이버 파워링크 영역의 실제 노출 순서 사용
+3. 동일 업체가 중복되면 네이버페이 배지가 보이는 광고 우선
+4. 업체명과 광고 도메인 매핑으로 회사 판별
+5. CAPTCHA 또는 접근 제한은 우회하지 않고 실패 기록
+6. 증빙 스크린샷은 GitHub Actions 아티팩트로 7일 보관
 
 CAPTCHA 또는 접근 제한을 우회하는 기능은 구현하지 않습니다.
 
@@ -80,5 +106,5 @@ Apps Script 주소와 공유 비밀값을 `src` 파일, GitHub Actions 로그 �
 - 비밀키는 `.env`에만 저장하며 Git에 커밋하지 않습니다.
 - 실제 스크린샷과 내부 원본 데이터는 `screenshots/`, `data/private/`에 저장하며 Git에서 제외합니다.
 - 브라우저로 전달되는 환경변수에는 비밀값을 넣지 않습니다.
-- 공개 포트폴리오에는 샘플 데이터만 사용합니다.
-- 저장소를 공개해도 실제 Apps Script 주소와 운영 데이터는 포함하지 않습니다.
+- Apps Script 주소·공유 비밀값·원본 Google Sheets는 공개 저장소에 포함하지 않습니다.
+- 오전 9시에 확정된 대시보드용 순위 데이터만 GitHub Pages 갱신에 사용합니다.
