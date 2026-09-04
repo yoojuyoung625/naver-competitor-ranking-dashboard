@@ -3,6 +3,8 @@ import { Activity, Bot, CheckCircle2, Clock3, Database, Sparkles } from "lucide-
 import { FilterBar } from "./components/FilterBar";
 import { RankingChart } from "./components/RankingChart";
 import { RankingTable } from "./components/RankingTable";
+import { TimeSegmentPanel } from "./components/TimeSegmentPanel";
+import { HourlyBoard } from "./components/HourlyBoard";
 import { sampleObservations } from "./data/sample";
 import { filterObservations, hourlySeries, summarizeCompanies } from "./lib/analytics";
 import type { DashboardFilters } from "./types";
@@ -45,10 +47,11 @@ export function App() {
       </section>
 
       <section className="card chart-card">
-        <div className="card-head"><div><span className="eyebrow dark">RANKING TREND</span><h2>일자별 평균 순위 흐름</h2></div><div className="legend">{visibleCompanies.map((company) => <span key={company}>{company}</span>)}</div></div>
+        <div className="card-head"><div><span className="eyebrow dark">RANKING TREND</span><h2>일자별 평균 순위 흐름</h2></div><div className="chart-actions"><div className="legend">{visibleCompanies.map((company) => <span key={company}>{company}</span>)}</div><HourlyBoard rows={scoped} /></div></div>
         <RankingChart data={series} companies={visibleCompanies} />
       </section>
 
+      <TimeSegmentPanel rows={fullScope} />
       <RankingTable rows={summaries} focused={filters.company} onFocus={(company) => setFilters({ ...filters, company })} />
 
       <footer>무단 전재 및 재배포 금지 · MINDKNOCK</footer>

@@ -1,4 +1,5 @@
 import type { CompanySummary, DashboardFilters, RankingObservation } from "../types";
+import { TIME_SEGMENTS } from "../config";
 
 export function filterObservations(rows: RankingObservation[], filters: DashboardFilters) {
   return rows.filter((row) => {
@@ -57,5 +58,17 @@ export function hourlySeries(rows: RankingObservation[]) {
         result[company] = Number(record[key]) / Number(record[`${key}_count`]);
       });
     return result;
+  });
+}
+
+export function timeSegmentSummary(rows: RankingObservation[]) {
+  return TIME_SEGMENTS.map((segment) => {
+    const values = rows.filter((row) => row.rank !== null && segment.hours.includes(new Date(row.observedAt).getHours() as never));
+    const byCompany = new Map<string, number[]>();
+    values.forEach((row) => byCompany.set(row.company, [...(byCompany.get(row.company) ?? []), row.rank!]));
+    const rankings = [...byCompany.entries()]
+      .map(([company, ranks]) => ({ company, average: ranks.reduce((sum, rank) => sum + rank, 0) / ranks.length }))
+      .sort((a, b) => a.average - b.average);
+    return { ...segment, rankings };
   });
 }

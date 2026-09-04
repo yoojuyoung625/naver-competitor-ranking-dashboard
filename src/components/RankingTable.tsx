@@ -5,11 +5,22 @@ import type { CompanySummary } from "../types";
 type Props = { rows: CompanySummary[]; focused: string | null; onFocus: (company: string | null) => void };
 
 export function RankingTable({ rows, focused, onFocus }: Props) {
+  const downloadCsv = () => {
+    const body = [
+      ["업체명", "평균 순위", "1위 점유율", "노출률", "표본"],
+      ...rows.map((row) => [row.company, row.averageRank?.toFixed(2) ?? "", (row.firstPlaceShare * 100).toFixed(1), (row.exposureShare * 100).toFixed(1), row.observations]),
+    ].map((line) => line.join(",")).join("\n");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob(["\ufeff" + body], { type: "text/csv;charset=utf-8" }));
+    link.download = "competitor-ranking-summary.csv";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
   return (
     <section className="card table-card">
       <div className="card-head">
         <div><span className="eyebrow dark">COMPETITOR PERFORMANCE</span><h2>업체별 통합 분석</h2></div>
-        <button className="ghost-button"><Download size={15} /> Excel 저장</button>
+        <button className="ghost-button" onClick={downloadCsv}><Download size={15} /> CSV 저장</button>
       </div>
       <div className="table-scroll">
         <table>
