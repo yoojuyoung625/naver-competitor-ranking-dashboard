@@ -25,11 +25,6 @@ export function summarizeCompanies(rows: RankingObservation[]): CompanySummary[]
       averageRank: ranked.length
         ? ranked.reduce((sum, value) => sum + (value.rank ?? 0), 0) / ranked.length
         : null,
-      weightedAverageRank: (() => {
-        const weighted = ranked.filter((value) => value.impressionWeight != null && value.impressionWeight > 0);
-        const totalWeight = weighted.reduce((sum, value) => sum + value.impressionWeight!, 0);
-        return totalWeight ? weighted.reduce((sum, value) => sum + value.rank! * value.impressionWeight!, 0) / totalWeight : null;
-      })(),
       firstPlaceShare: ranked.filter((value) => value.rank === 1).length / totalSlots,
       exposureShare: ranked.length / totalSlots,
       observations: ranked.length,

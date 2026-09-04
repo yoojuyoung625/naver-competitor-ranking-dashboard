@@ -9,8 +9,6 @@ export interface RankingObservation {
   observedAt: string;
   company: string;
   rank: number | null;
-  /** Optional actual/estimated impressions for this keyword-device-time observation. */
-  impressionWeight?: number | null;
   placement: "POWER_LINK" | "OTHER";
   screenshotPath: string | null;
   status: CollectionStatus;
@@ -28,7 +26,6 @@ export interface DashboardFilters {
 export interface CompanySummary {
   company: string;
   averageRank: number | null;
-  weightedAverageRank?: number | null;
   firstPlaceShare: number;
   exposureShare: number;
   observations: number;
