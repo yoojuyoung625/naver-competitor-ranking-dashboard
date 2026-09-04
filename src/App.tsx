@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Activity, Bot, CheckCircle2, Clock3, Database, Sparkles } from "lucide-react";
 import { FilterBar } from "./components/FilterBar";
 import { RankingChart } from "./components/RankingChart";
@@ -7,12 +7,28 @@ import { TimeSegmentPanel } from "./components/TimeSegmentPanel";
 import { HourlyBoard } from "./components/HourlyBoard";
 import { sampleObservations } from "./data/sample";
 import { filterObservations, hourlySeries, summarizeCompanies } from "./lib/analytics";
-import type { DashboardFilters } from "./types";
+import type { DashboardFilters, RankingObservation } from "./types";
 
 export function App() {
+  const [observations, setObservations] = useState<RankingObservation[]>(sampleObservations);
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [filters, setFilters] = useState<DashboardFilters>({ keyword: "자동차보험", device: "ALL", month: "2026-09", company: null });
-  const scoped = useMemo(() => filterObservations(sampleObservations, filters), [filters]);
-  const fullScope = useMemo(() => filterObservations(sampleObservations, { ...filters, company: null }), [filters]);
+  useEffect(() => {
+    fetch(`${import.meta.env.BASE_URL}data/latest.json`, { cache: "no-store" })
+      .then((response) => {
+        if (!response.ok) throw new Error("확정 데이터 없음");
+        return response.json();
+      })
+      .then((payload) => {
+        if (Array.isArray(payload.observations) && payload.observations.length) {
+          setObservations(payload.observations);
+          setGeneratedAt(payload.generatedAt ?? null);
+        }
+      })
+      .catch(() => undefined);
+  }, []);
+  const scoped = useMemo(() => filterObservations(observations, filters), [observations, filters]);
+  const fullScope = useMemo(() => filterObservations(observations, { ...filters, company: null }), [observations, filters]);
   const summaries = useMemo(() => summarizeCompanies(fullScope).sort((a, b) => (a.averageRank ?? 99) - (b.averageRank ?? 99)), [fullScope]);
   const series = useMemo(() => hourlySeries(scoped), [scoped]);
   const visibleCompanies = filters.company ? [filters.company] : summaries.map((row) => row.company);
@@ -28,7 +44,7 @@ export function App() {
           <h1>타사 순위 분석 솔루션 <em>(AI)</em></h1>
           <p>검색 노출 순위의 시간대별 변화와 경쟁사 운영 패턴을 한 화면에서 분석합니다.</p>
         </div>
-        <div className="sync-status"><span className="pulse" /><div><strong>수집 정상</strong><small>최근 업데이트 2026. 09. 04 11:00</small></div></div>
+        <div className="sync-status"><span className="pulse" /><div><strong>{generatedAt ? "전일 데이터 확정" : "데모 데이터 표시"}</strong><small>최근 업데이트 {generatedAt ? new Date(generatedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) : "연동 전"}</small></div></div>
       </header>
 
       <FilterBar filters={filters} onChange={setFilters} />

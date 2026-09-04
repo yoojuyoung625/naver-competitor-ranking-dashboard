@@ -12,6 +12,7 @@ export interface RankingObservation {
   placement: "POWER_LINK" | "OTHER";
   screenshotPath: string | null;
   status: CollectionStatus;
+  naverPay?: boolean;
   collectorVersion: string;
 }
 
