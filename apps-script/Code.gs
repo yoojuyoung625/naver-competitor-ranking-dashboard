@@ -14,14 +14,14 @@ function doPost(e) {
 }
 
 function appendHourly_(results) {
-  const sheet = sheet_(RAW_SHEET, ["observed_at", "keyword", "device", "company", "rank", "placement", "status", "screenshot_path", "message", "received_at", "naver_pay"]);
+  const sheet = sheet_(RAW_SHEET, ["observed_at", "keyword", "device", "company", "rank", "placement", "status", "screenshot_path", "message", "received_at", "naver_pay", "impression_weight"]);
   const rows = [];
   results.forEach(result => {
     if (!result.placements || !result.placements.length) {
-      rows.push([result.observedAt, result.keyword, result.device, "", "", "", result.status, result.screenshotPath || "", result.message || "", new Date(), false]);
+      rows.push([result.observedAt, result.keyword, result.device, "", "", "", result.status, result.screenshotPath || "", result.message || "", new Date(), false, result.impressionWeight || ""]);
       return;
     }
-    result.placements.forEach(item => rows.push([result.observedAt, result.keyword, result.device, item.company, item.rank, item.placement, result.status, result.screenshotPath || "", result.message || "", new Date(), Boolean(item.naverPay)]));
+    result.placements.forEach(item => rows.push([result.observedAt, result.keyword, result.device, item.company, item.rank, item.placement, result.status, result.screenshotPath || "", result.message || "", new Date(), Boolean(item.naverPay), item.impressionWeight || result.impressionWeight || ""]));
   });
   if (rows.length) sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
   return { ok: true, inserted: rows.length };
@@ -31,7 +31,7 @@ function finalizeYesterday_() {
   const tz = "Asia/Seoul";
   const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const targetDate = Utilities.formatDate(yesterday, tz, "yyyy-MM-dd");
-  const raw = sheet_(RAW_SHEET, ["observed_at", "keyword", "device", "company", "rank", "placement", "status", "screenshot_path", "message", "received_at", "naver_pay"]);
+  const raw = sheet_(RAW_SHEET, ["observed_at", "keyword", "device", "company", "rank", "placement", "status", "screenshot_path", "message", "received_at", "naver_pay", "impression_weight"]);
   const values = raw.getDataRange().getValues();
   const observations = values.slice(1).filter(row => dateKey_(row[0], tz) === targetDate && row[3] && row[4] !== "");
   const daily = sheet_(DAILY_SHEET, ["date", "keyword", "device", "company", "average_rank", "samples", "finalized_at"]);
@@ -54,7 +54,7 @@ function buildPayload_(date, rows) {
     generatedAt: new Date().toISOString(),
     date: date,
     observations: rows.map((row, index) => ({
-      id: [date, row[1], row[2], row[3], index].join("-"), keyword: row[1], device: row[2], observedAt: row[0], company: row[3], rank: Number(row[4]), placement: row[5], screenshotPath: null, status: row[6], naverPay: Boolean(row[10]), collectorVersion: "gas-1.1.0"
+      id: [date, row[1], row[2], row[3], index].join("-"), keyword: row[1], device: row[2], observedAt: row[0], company: row[3], rank: Number(row[4]), impressionWeight: row[11] === "" || row[11] == null ? null : Number(row[11]), placement: row[5], screenshotPath: null, status: row[6], naverPay: Boolean(row[10]), collectorVersion: "gas-1.2.0"
     }))
   };
 }
