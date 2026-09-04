@@ -11,7 +11,7 @@ export function RankingChart({ data, companies }: Props) {
           <CartesianGrid stroke="#e8edf4" vertical={false} />
           <XAxis dataKey="time" tick={{ fill: "#64748b", fontSize: 11 }} minTickGap={36} />
           <YAxis reversed domain={[1, 10]} ticks={[1, 2, 4, 6, 8, 10]} tick={{ fill: "#64748b", fontSize: 11 }} />
-          <Tooltip formatter={(value) => [`${Number(value).toFixed(2)}위`, "평균 순위"]} />
+          <Tooltip formatter={(value) => [`${Number(value).toFixed(1)}위`, "평균 순위"]} />
           {companies.map((company) => (
             <Line
               key={company}

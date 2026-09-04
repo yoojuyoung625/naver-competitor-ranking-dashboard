@@ -16,7 +16,7 @@ export function TimeSegmentPanel({ rows }: { rows: RankingObservation[] }) {
             <span>{segment.label}</span><small>{String(segment.hours[0]).padStart(2,"0")}–{String(segment.hours.at(-1)).padStart(2,"0")}시</small>
             <strong>{best?.company ?? "미수집"}</strong>
             <div className="rank-bar"><i style={{ width: `${Math.max(8, 100 - (best?.average ?? 10) * 8)}%`, background: best ? COMPANY_COLORS[best.company] : "#cbd5e1" }} /></div>
-            <small>우위 {best?.average.toFixed(2) ?? "-"}위 · 열위 {worst?.company ?? "-"}</small>
+            <small>우위 {best?.average.toFixed(1) ?? "-"}위 · 열위 {worst?.company ?? "-"}</small>
           </article>;
         })}
       </div>
