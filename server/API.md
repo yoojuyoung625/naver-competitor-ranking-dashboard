@@ -17,3 +17,7 @@ Query: `keyword`, `device`, `from`, `to`, `company`
 ## `GET /api/screenshots/:id`
 
 인증된 내부 사용자에게만 증빙 이미지를 반환합니다. 공개 대시보드에서는 호출하지 않습니다.
+
+## 외부 수집 연동
+
+Google Apps Script 연동 주소와 공유 비밀값은 서버 환경변수에서만 읽습니다. 클라이언트 번들에는 두 값이 포함되면 안 됩니다.

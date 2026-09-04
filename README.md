@@ -58,9 +58,21 @@ pnpm build
 
 CAPTCHA 또는 접근 제한을 우회하는 기능은 구현하지 않습니다.
 
+## Google Apps Script 연결
+
+기존 보고서의 Apps Script 주소는 사용하지 않습니다. 본인 계정에서 새 웹 앱을 만든 뒤 서버의 `.env`에만 다음 값을 입력합니다.
+
+```env
+COLLECTOR_GAS_WEB_APP_URL=https://script.google.com/macros/s/본인_배포_ID/exec
+COLLECTOR_SHARED_SECRET=충분히_긴_임의값
+```
+
+Apps Script 주소와 공유 비밀값을 `src` 파일, GitHub Actions 로그 또는 공개 HTML에 직접 작성하지 않습니다. 브라우저는 Apps Script를 직접 호출하지 않고 내부 서버 API를 통해 필요한 집계 데이터만 조회하도록 구성합니다.
+
 ## 보안
 
 - 비밀키는 `.env`에만 저장하며 Git에 커밋하지 않습니다.
 - 실제 스크린샷과 내부 원본 데이터는 `screenshots/`, `data/private/`에 저장하며 Git에서 제외합니다.
 - 브라우저로 전달되는 환경변수에는 비밀값을 넣지 않습니다.
 - 공개 포트폴리오에는 샘플 데이터만 사용합니다.
+- 저장소를 공개해도 실제 Apps Script 주소와 운영 데이터는 포함하지 않습니다.
