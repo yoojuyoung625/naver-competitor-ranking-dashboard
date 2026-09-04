@@ -1,76 +1,63 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, Bot, CheckCircle2, Clock3, Database, Sparkles } from "lucide-react";
-import { FilterBar } from "./components/FilterBar";
-import { RankingChart } from "./components/RankingChart";
-import { RankingTable } from "./components/RankingTable";
-import { TimeSegmentPanel } from "./components/TimeSegmentPanel";
-import { HourlyBoard } from "./components/HourlyBoard";
+import { BarChart3, Bot, CalendarDays, Download, List, Monitor, Sparkles, Tag, X } from "lucide-react";
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { COMPANY_COLORS, COMPANIES, KEYWORDS, TIME_SEGMENTS } from "./config";
 import { sampleObservations } from "./data/sample";
-import { filterObservations, hourlySeries, summarizeCompanies } from "./lib/analytics";
-import type { DashboardFilters, RankingObservation } from "./types";
+import type { RankingObservation } from "./types";
+
+type KeywordFilter = "TOP2 (통합)" | "비교 (통합)" | (typeof KEYWORDS)[number];
+type DeviceFilter = "ALL" | "PC" | "MOBILE";
+type TimeFilter = "ALL" | (typeof TIME_SEGMENTS)[number]["id"];
+const MONTHS = ["2026-07", "2026-08", "2026-09"];
+const keywordButtons: { value: KeywordFilter; label: string }[] = [
+  { value: "TOP2 (통합)", label: "TOP2 (통합)" }, { value: "자동차보험", label: "자동차보험" }, { value: "다이렉트자동차보험", label: "다이렉트자동차보험" },
+  { value: "비교 (통합)", label: "비교 (통합)" }, { value: "비교견적사이트", label: "비교견적사이트" }, { value: "자동차보험비교", label: "자동차보험비교" },
+];
+
+function kst(value: string) {
+  const p = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23", weekday: "short" }).formatToParts(new Date(value)).reduce<Record<string,string>>((a, v) => ({ ...a, [v.type]: v.value }), {});
+  return { date: `${p.year}-${p.month}-${p.day}`, month: `${p.year}-${p.month}`, hour: Number(p.hour), weekday: p.weekday };
+}
+function keywordsFor(value: KeywordFilter) { return value === "TOP2 (통합)" ? [KEYWORDS[0], KEYWORDS[1]] : value === "비교 (통합)" ? [KEYWORDS[2], KEYWORDS[3]] : [value]; }
+function avg(rows: RankingObservation[]) { const a = rows.flatMap((r) => r.rank == null ? [] : [r.rank]); return a.length ? a.reduce((s,n) => s+n,0)/a.length : null; }
+function rank(value: number | null) { return value == null ? "-" : `${value.toFixed(2)}위`; }
+function prevMonth(month: string) { const [y,m]=month.split("-").map(Number); const d=new Date(y,m-2,1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; }
+function sortedCompanies(rows: RankingObservation[]) { return COMPANIES.map(company => ({ company, average: avg(rows.filter(r=>r.company===company)) })).filter(v=>v.average!=null).sort((a,b)=>a.average!-b.average!); }
+function excel(filename:string, headers:string[], rows:(string|number)[][]) { const body=`<table><tr>${headers.map(v=>`<th>${v}</th>`).join("")}</tr>${rows.map(r=>`<tr>${r.map(v=>`<td>${v}</td>`).join("")}</tr>`).join("")}</table>`; const blob=new Blob([`<html><meta charset="utf-8">${body}</html>`],{type:"application/vnd.ms-excel"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=filename; a.click(); URL.revokeObjectURL(a.href); }
 
 export function App() {
-  const [observations, setObservations] = useState<RankingObservation[]>(sampleObservations);
-  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
-  const [filters, setFilters] = useState<DashboardFilters>({ keyword: "자동차보험", device: "ALL", month: "2026-09", company: null });
-  useEffect(() => {
-    fetch(`${import.meta.env.BASE_URL}data/latest.json`, { cache: "no-store" })
-      .then((response) => {
-        if (!response.ok) throw new Error("확정 데이터 없음");
-        return response.json();
-      })
-      .then((payload) => {
-        if (Array.isArray(payload.observations) && payload.observations.length) {
-          setObservations(payload.observations);
-          setGeneratedAt(payload.generatedAt ?? null);
-        }
-      })
-      .catch(() => undefined);
-  }, []);
-  const scoped = useMemo(() => filterObservations(observations, filters), [observations, filters]);
-  const fullScope = useMemo(() => filterObservations(observations, { ...filters, company: null }), [observations, filters]);
-  const summaries = useMemo(() => summarizeCompanies(fullScope).sort((a, b) => (a.averageRank ?? 99) - (b.averageRank ?? 99)), [fullScope]);
-  const series = useMemo(() => hourlySeries(scoped), [scoped]);
-  const visibleCompanies = filters.company ? [filters.company] : summaries.map((row) => row.company);
-  const ranked = scoped.filter((row) => row.rank !== null);
-  const averageRank = ranked.length ? ranked.reduce((sum, row) => sum + (row.rank ?? 0), 0) / ranked.length : 0;
-  const successRate = scoped.length ? scoped.filter((row) => row.status === "SUCCESS").length / scoped.length : 0;
-
-  return (
-    <main>
-      <header className="hero">
-        <div>
-          <span className="eyebrow"><Sparkles size={14} /> AI RANKING INTELLIGENCE</span>
-          <h1>타사 순위 분석 솔루션 <em>(AI)</em></h1>
-          <p>검색 노출 순위의 시간대별 변화와 경쟁사 운영 패턴을 한 화면에서 분석합니다.</p>
-        </div>
-        <div className="sync-status"><span className="pulse" /><div><strong>{generatedAt ? "전일 데이터 확정" : "데모 데이터 표시"}</strong><small>최근 업데이트 {generatedAt ? new Date(generatedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) : "연동 전"}</small></div></div>
-      </header>
-
-      <FilterBar filters={filters} onChange={setFilters} />
-
-      <section className="kpi-grid">
-        <article className="kpi"><Activity /><span>평균 순위</span><strong>{averageRank.toFixed(2)}위</strong><small>숫자가 낮을수록 우위</small></article>
-        <article className="kpi"><CheckCircle2 /><span>수집 성공률</span><strong>{(successRate * 100).toFixed(1)}%</strong><small>부분 수집 별도 표기</small></article>
-        <article className="kpi"><Database /><span>분석 표본</span><strong>{ranked.length.toLocaleString()}</strong><small>현재 필터 기준</small></article>
-        <article className="kpi"><Clock3 /><span>분석 시간대</span><strong>24H</strong><small>1시간 간격 추적</small></article>
-      </section>
-
-      <section className="insight-card">
-        <div className="ai-icon"><Bot /></div>
-        <div><span className="eyebrow dark">AI OPERATION INSIGHT</span><h2>운영 전략 및 패턴 분석</h2><p><b>{summaries[0]?.company}</b>이 현재 조건에서 가장 높은 평균 순위를 유지하고 있습니다. 오후 시간대의 경쟁 강도가 높아지며, 모바일의 업체 간 순위 변동폭이 PC보다 크게 나타납니다.</p></div>
-        <button>상세 인사이트</button>
-      </section>
-
-      <section className="card chart-card">
-        <div className="card-head"><div><span className="eyebrow dark">RANKING TREND</span><h2>일자별 평균 순위 흐름</h2></div><div className="chart-actions"><div className="legend">{visibleCompanies.map((company) => <span key={company}>{company}</span>)}</div><HourlyBoard rows={scoped} /></div></div>
-        <RankingChart data={series} companies={visibleCompanies} />
-      </section>
-
-      <TimeSegmentPanel rows={fullScope} />
-      <RankingTable rows={summaries} focused={filters.company} onFocus={(company) => setFilters({ ...filters, company })} />
-
-      <footer>무단 전재 및 재배포 금지 · MINDKNOCK</footer>
-    </main>
-  );
+  const [observations,setObservations]=useState<RankingObservation[]>(sampleObservations), [generatedAt,setGeneratedAt]=useState<string|null>(null);
+  const [keyword,setKeyword]=useState<KeywordFilter>("TOP2 (통합)"), [device,setDevice]=useState<DeviceFilter>("ALL"), [month,setMonth]=useState("2026-09"), [timeFilter,setTimeFilter]=useState<TimeFilter>("ALL");
+  const [includeWeekend,setIncludeWeekend]=useState(false), [compareHourly,setCompareHourly]=useState(false), [compareWeekend,setCompareWeekend]=useState(false), [focused,setFocused]=useState<string|null>(null), [modal,setModal]=useState(false);
+  useEffect(()=>{ fetch(`${import.meta.env.BASE_URL}data/latest.json`,{cache:"no-store"}).then(r=>{if(!r.ok)throw 0;return r.json()}).then(p=>{if(p.observations?.length){setObservations(p.observations);setGeneratedAt(p.generatedAt??null)}}).catch(()=>undefined) },[]);
+  const base=useMemo(()=>observations.filter(r=>keywordsFor(keyword).includes(r.keyword as never)&&(device==="ALL"||r.device===device)),[observations,keyword,device]);
+  const monthRows=useMemo(()=>base.filter(r=>kst(r.observedAt).month===month),[base,month]);
+  const chartRows=useMemo(()=>monthRows.filter(r=>{const p=kst(r.observedAt), seg=TIME_SEGMENTS.find(s=>s.id===timeFilter);return(includeWeekend||!["Sat","Sun"].includes(p.weekday))&&(!seg||seg.hours.includes(p.hour as never))}),[monthRows,includeWeekend,timeFilter]);
+  const visible=focused?chartRows.filter(r=>r.company===focused):chartRows, summaries=sortedCompanies(chartRows), previous=base.filter(r=>kst(r.observedAt).month===prevMonth(month));
+  const daily=useMemo(()=>[...new Set(visible.map(r=>kst(r.observedAt).date))].sort().map(date=>({date:date.slice(5).replace("-","/"),...Object.fromEntries(COMPANIES.map(c=>[c,avg(visible.filter(r=>kst(r.observedAt).date===date&&r.company===c))]))})),[visible]);
+  const detail=useMemo(()=>[...new Set(chartRows.map(r=>kst(r.observedAt).date))].sort().map(date=>({date,values:Object.fromEntries(COMPANIES.map(c=>[c,avg(chartRows.filter(r=>kst(r.observedAt).date===date&&r.company===c))]))})),[chartRows]);
+  const weeks=useMemo(()=>{const m=new Map<string,RankingObservation[]>();chartRows.forEach(r=>{const key=`${Math.ceil(Number(kst(r.observedAt).date.slice(-2))/7)}주차`;m.set(key,[...(m.get(key)??[]),r])});return[...m].map(([label,rows])=>({label,rows}))},[chartRows]);
+  const hourly=useMemo(()=>TIME_SEGMENTS.map(s=>({...s,values:Object.fromEntries(COMPANIES.map(c=>[c,avg(monthRows.filter(r=>r.company===c&&s.hours.includes(kst(r.observedAt).hour as never)))]))})),[monthRows]);
+  const prevHourly=useMemo(()=>TIME_SEGMENTS.map(s=>({...s,values:Object.fromEntries(COMPANIES.map(c=>[c,avg(previous.filter(r=>r.company===c&&s.hours.includes(kst(r.observedAt).hour as never)))]))})),[previous]);
+  const weekend=useMemo(()=>COMPANIES.map(company=>{const rows=monthRows.filter(r=>r.company===company),weekday=avg(rows.filter(r=>!["Sat","Sun"].includes(kst(r.observedAt).weekday))),weekend=avg(rows.filter(r=>["Sat","Sun"].includes(kst(r.observedAt).weekday)));return{company,weekday,weekend,diff:weekday!=null&&weekend!=null?weekend-weekday:null}}).filter(r=>r.weekday!=null||r.weekend!=null),[monthRows]);
+  const best=summaries[0], worst=summaries.at(-1), insight=best?`${best.company}이(가) 평균 ${best.average!.toFixed(2)}위로 가장 우수합니다. ${worst?.company??"-"} 대비 ${((worst?.average??best.average!)-best.average!).toFixed(2)}위 앞서며, 시간대별 변동을 통해 입찰 집중 구간을 확인할 수 있습니다.`:"선택 조건에 수집된 데이터가 없습니다.";
+  return <div className="dashboard-container"><div className="ambient blue"/><div className="ambient indigo"/><div className="ambient sky"/>
+    <header className="top-shell"><section className="hero-card"><span className="pill"><Sparkles/> AI RANKING INTELLIGENCE</span><h1>타사 순위 분석 솔루션 (AI)</h1><p>최근 타사들의 순위 입찰 전략과 점유율 변화, 운영 특이사항을 AI가 파악합니다.</p><span className="status"><i/>{generatedAt?`전일 확정 · ${new Date(generatedAt).toLocaleString("ko-KR",{timeZone:"Asia/Seoul"})}`:"공개 데모 데이터"}</span></section>
+    <section className="control-card"><div className="control-row keyword-row"><Label icon={<Tag/>}>Keyword</Label><Segments items={keywordButtons.map(v=>[v.value,v.label])} value={keyword} set={v=>setKeyword(v as KeywordFilter)}/><button className="detail-button" onClick={()=>setModal(true)}><List/>24H 상세 랭킹보드</button></div><div className="control-row"><Label icon={<Monitor/>}>Device</Label><Segments items={[["ALL","통합"],["PC","PC"],["MOBILE","Mobile"]]} value={device} set={v=>setDevice(v as DeviceFilter)}/><Label icon={<CalendarDays/>}>Month</Label><Segments items={MONTHS.map(v=>[v,v])} value={month} set={setMonth}/></div>{focused&&<button className="focus-chip" onClick={()=>setFocused(null)}><i/>{focused} 집중 분석 모드 (Click to Reset)</button>}</section></header>
+    <main className="report-shell"><Card title="AI 운영 전략 및 패턴 분석 리포트 (선택 키워드 기준)" icon={<Bot/>}><div className="insight"><b>선택 조건 종합 분석</b><p>{insight}</p><p>• 현재 기준: <strong>{keyword}</strong> · <strong>{device==="ALL"?"통합":device}</strong> · <strong>{month}</strong></p><p>• 순위 숫자가 낮을수록 검색 결과 상단에 노출된 것을 의미합니다.</p></div></Card>
+    <Card title="일자별 평균 순위 흐름 (선택 월)" action={<Toggle label="주말 포함" value={includeWeekend} set={setIncludeWeekend}/>}><TimeButtons value={timeFilter} set={setTimeFilter}/><div className="chart-area"><ResponsiveContainer width="100%" height={400}><LineChart data={daily}><CartesianGrid stroke="#e8edf4" vertical={false}/><XAxis dataKey="date"/><YAxis reversed domain={[1,10]} ticks={[1,2,3,4,5,6,7,8,9,10]}/><Tooltip formatter={v=>rank(Number(v))}/>{(focused?[focused]:COMPANIES).map(c=><Line key={c} dataKey={c} type="monotone" stroke={COMPANY_COLORS[c]} strokeWidth={2.4} dot={{r:2}} connectNulls/>)}</LineChart></ResponsiveContainer></div><div className="subheading"><span><BarChart3/>일자별 상세 데이터</span><small>Tip: 업체명을 클릭하면 전체 대시보드가 필터링됩니다.</small><button className="excel" onClick={()=>excel(`${month}_일자별순위.xls`,["날짜",...COMPANIES],detail.map(r=>[r.date,...COMPANIES.map(c=>rank(r.values[c]))]))}><Download/>Excel 저장</button></div><div className="table-scroll daily"><table className="pro-table"><thead><tr><th>날짜</th>{COMPANIES.map(c=><th key={c}><Company name={c} set={setFocused}/></th>)}</tr></thead><tbody>{detail.map(r=><tr key={r.date}><td>{r.date}</td>{COMPANIES.map(c=><td key={c}>{rank(r.values[c])}</td>)}</tr>)}</tbody></table></div></Card>
+    <Card title="주차별 및 월별 평균 순위 통합 분석"><div className="table-scroll"><table className="pro-table"><thead><tr><th>업체명</th><th>{prevMonth(month)} 전체평균</th>{weeks.map(w=><th key={w.label}>{w.label}</th>)}<th>{month} 전체평균</th><th>WoW (전주 比)</th><th>MoM (전월 比)</th></tr></thead><tbody>{COMPANIES.map(c=>{const cur=avg(chartRows.filter(r=>r.company===c)),pre=avg(previous.filter(r=>r.company===c)),wv=weeks.map(w=>avg(w.rows.filter(r=>r.company===c))),wow=wv.length>1&&wv.at(-1)!=null&&wv.at(-2)!=null?wv.at(-1)!-wv.at(-2)!:null;return <tr key={c}><td><Company name={c} set={setFocused}/></td><td>{rank(pre)}</td>{wv.map((v,i)=><td key={i}>{rank(v)}</td>)}<td>{rank(cur)}</td><td><Diff value={wow}/></td><td><Diff value={cur!=null&&pre!=null?cur-pre:null}/></td></tr>})}</tbody></table></div><Analysis title="Weekly & Monthly Strategy Insight">{best?`${best.company}이(가) 선택 월 전체 평균 선두입니다. 주차별 변화로 순위 방어와 공격적 입찰 시점을 확인하세요.`:"비교 데이터가 없습니다."}</Analysis></Card>
+    <Card title="시간대별 플레이 분석 (Time Segments)" action={<Toggle label="지난달과 비교하기" value={compareHourly} set={setCompareHourly}/>}><div className="legend"><i className="best"/> 해당 시간대 1위 (Best)<i className="worst"/> 최하위(열위)</div><div className="table-scroll"><table className="pro-table"><thead><tr><th>업체명</th>{TIME_SEGMENTS.map(s=><th key={s.id}>{s.label}<small>{String(s.hours[0]).padStart(2,"0")}–{String(s.hours.at(-1)).padStart(2,"0")}시</small></th>)}</tr></thead><tbody>{COMPANIES.map(c=><tr key={c}><td><Company name={c} set={setFocused}/></td>{hourly.map((s,i)=>{const v=s.values[c],nums=Object.values(s.values).filter((n):n is number=>n!=null),cls=v!=null&&v===Math.min(...nums)?"best-cell":v!=null&&v===Math.max(...nums)?"worst-cell":"",pv=prevHourly[i].values[c];return <td className={cls} key={s.id}>{rank(v)}{compareHourly&&<small><Diff value={v!=null&&pv!=null?v-pv:null}/></small>}</td>})}</tr>)}</tbody></table></div><Analysis title="Hourly Operation Pattern Insight">시간대별 우위·열위 구간을 기준으로 예산과 입찰 강도를 조정할 수 있습니다.</Analysis></Card>
+    <Card title="평일 vs 주말 운영 비교" action={<Toggle label="지난달과 비교하기" value={compareWeekend} set={setCompareWeekend}/>}><div className="table-scroll"><table className="pro-table"><thead><tr><th>업체명</th><th>평일(월~금)</th><th>주말(토,일)</th><th>차이</th><th>운영 패턴</th></tr></thead><tbody>{weekend.map(r=><tr key={r.company}><td><Company name={r.company} set={setFocused}/></td><td>{rank(r.weekday)}</td><td>{rank(r.weekend)}</td><td><Diff value={r.diff}/></td><td>{r.diff==null?"비교 데이터 부족":Math.abs(r.diff)<.3?"유사 운영":r.diff<0?"주말 강화":"평일 강화"}{compareWeekend&&" · 전월 비교"}</td></tr>)}</tbody></table></div></Card></main>
+    <footer><p>무단 전재 및 재배포 금지 (Do not reproduce or distribute without permission)</p><b>MINDKNOCK</b></footer>{modal&&<Modal rows={monthRows} month={month} close={()=>setModal(false)}/>}</div>;
 }
+
+function Label({icon,children}:{icon:React.ReactNode;children:React.ReactNode}){return <span className="control-label">{icon}{children}</span>}
+function Segments({items,value,set}:{items:(string[])[];value:string;set:(v:string)=>void}){return <div className="segments">{items.map(([v,l])=><button className={value===v?"active":""} onClick={()=>set(v)} key={v}>{l}</button>)}</div>}
+function Card({title,icon,action,children}:{title:string;icon?:React.ReactNode;action?:React.ReactNode;children:React.ReactNode}){return <section className="card"><header><h3>{icon}{title}</h3>{action}</header><div className="card-body">{children}</div></section>}
+function Toggle({label,value,set}:{label:string;value:boolean;set:(v:boolean)=>void}){return <label className="toggle-label"><button role="switch" aria-checked={value} className={`toggle ${value?"on":""}`} onClick={()=>set(!value)}><i/></button>{label}</label>}
+function TimeButtons({value,set}:{value:TimeFilter;set:(v:TimeFilter)=>void}){return <div className="time-buttons"><button className={value==="ALL"?"active":""} onClick={()=>set("ALL")}>전체 시간대</button>{TIME_SEGMENTS.map(s=><button className={value===s.id?"active":""} onClick={()=>set(s.id)} key={s.id}>{s.label}</button>)}</div>}
+function Company({name,set}:{name:string;set:(v:string)=>void}){return <button className="company" onClick={()=>set(name)}>{name}</button>}
+function Diff({value}:{value:number|null}){return value==null?<span className="muted">-</span>:<span className={`diff ${value<=0?"good":"bad"}`}>{value>0?"+":""}{value.toFixed(2)}</span>}
+function Analysis({title,children}:{title:string;children:React.ReactNode}){return <div className="analysis"><b>{title}</b><p>{children}</p></div>}
+function Modal({rows,month,close}:{rows:RankingObservation[];month:string;close:()=>void}){const [keyword,setKeyword]=useState(KEYWORDS[0]),[device,setDevice]=useState<DeviceFilter>("ALL"),[time,setTime]=useState<TimeFilter>("ALL");const filtered=rows.filter(r=>r.keyword===keyword&&(device==="ALL"||r.device===device)&&(time==="ALL"||TIME_SEGMENTS.find(s=>s.id===time)?.hours.includes(kst(r.observedAt).hour as never))),dates=[...new Set(filtered.map(r=>kst(r.observedAt).date))].sort();return <div className="modal-bg" onMouseDown={e=>e.target===e.currentTarget&&close()}><section className="modal"><header><h3><List/>24H 상세 랭킹 보드</h3><div><button className="excel green" onClick={()=>excel(`${month}_24H상세순위.xls`,["시간","키워드","디바이스","업체","순위","네이버페이"],filtered.map(r=>[new Date(r.observedAt).toLocaleString("ko-KR",{timeZone:"Asia/Seoul"}),r.keyword,r.device,r.company,r.rank??"-",r.naverPay?"Y":"N"]))}><Download/>Excel 저장 (전체 업체)</button><button className="close" onClick={close}><X/></button></div></header><div className="modal-filter"><Label icon={<Tag/>}>Keyword</Label><Segments items={KEYWORDS.map(v=>[v,v])} value={keyword} set={v=>setKeyword(v as typeof keyword)}/><Label icon={<Monitor/>}>Device</Label><Segments items={[["ALL","통합"],["PC","PC"],["MOBILE","Mobile"]]} value={device} set={v=>setDevice(v as DeviceFilter)}/><TimeButtons value={time} set={setTime}/></div><div className="modal-table"><table className="pro-table"><thead><tr><th>시간 \ 일자</th>{dates.map(d=><th key={d}>{d.slice(5)}</th>)}</tr></thead><tbody>{Array.from({length:24},(_,h)=><tr key={h}><td>{String(h).padStart(2,"0")}:00</td>{dates.map(d=><td key={d}>{sortedCompanies(filtered.filter(r=>kst(r.observedAt).date===d&&kst(r.observedAt).hour===h)).map(v=><span className="rank-chip" style={{borderColor:COMPANY_COLORS[v.company]}} key={v.company}>{v.company} {v.average!.toFixed(1)}</span>)}</td>)}</tr>)}</tbody></table></div></section></div>}
